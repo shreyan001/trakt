@@ -1,0 +1,57 @@
+{
+  "model": {
+    "name": "EscrowAgent-v1.0",
+    "version": "1.0.0",
+    "type": "language_model",
+    "architecture": "transformer",
+    "description": "Specialized AI model for escrow smart contract generation and management"
+  },
+  "parameters": {
+    "max_tokens": 4096,
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "frequency_penalty": 0.1,
+    "presence_penalty": 0.1,
+    "context_length": 8192,
+    "parameter_count": "7B"
+  },
+  "capabilities": {
+    "smart_contract_generation": true,
+    "security_analysis": true,
+    "code_review": true,
+    "risk_assessment": true,
+    "multi_chain_support": true,
+    "gas_optimization": true
+  },
+  "supported_networks": [
+    "ethereum",
+    "polygon",
+    "bsc",
+    "arbitrum",
+    "optimism",
+    "0g-chain"
+  ],
+  "security_features": {
+    "access_control_validation": true,
+    "reentrancy_protection": true,
+    "overflow_protection": true,
+    "time_lock_validation": true,
+    "multi_sig_support": true
+  },
+  "training_data": {
+    "smart_contracts": "10000+",
+    "security_audits": "5000+",
+    "escrow_patterns": "500+",
+    "last_updated": "2024-01-15"
+  },
+  "compliance": {
+    "erc_standards": ["ERC20", "ERC721", "ERC1155"],
+    "security_standards": ["OpenZeppelin", "ConsenSys"],
+    "audit_frameworks": ["MythX", "Slither", "Securify"]
+  },
+  "performance": {
+    "inference_time_ms": 150,
+    "memory_usage_mb": 2048,
+    "throughput_requests_per_second": 100
+  }
+}
