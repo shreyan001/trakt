@@ -9,7 +9,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import "hardhat-deploy";
 import "hardhat-deploy-ethers";
 
-import * as TypechainTypes from "../../typechain-types";
+import * as TypechainTypes from "../Trakt-contracts/typechain-types";
 export let Factories = {} as typeof TypechainTypes;
 try {
     Factories = require("../../typechain-types") as typeof TypechainTypes;

@@ -1,9 +1,9 @@
-import { AgentsGuildInterface } from "../components/AgentsGuild";
+import { MainPage } from "../components/mainPage";
 
 export default function Home() {
   return (
     <>
-      <AgentsGuildInterface />
+      <MainPage />
       </>
   );
 }

@@ -1,6 +1,6 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { CONTRACTS, deployInBeaconProxy, deployDirectly, getTypedContract } from "../utils/utils";
+import { CONTRACTS, deployInBeaconProxy, deployDirectly, getTypedContract } from "../utils-v/utils";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // 1. Deploy TEEVerifier
@@ -14,7 +14,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     // 2. Prepare initialization parameters
     const nftName =  "Trakt Agent";
-    const nftSymbol = "PACT";
+    const nftSymbol = "TRKT";
     const chainURL = process.env.ZG_RPC_URL || "https://evmrpc-testnet.0g.ai";
     const indexerURL = process.env.ZG_INDEXER_URL || "https://indexer-storage-testnet-turbo.0g.ai";
 

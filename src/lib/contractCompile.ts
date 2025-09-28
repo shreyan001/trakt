@@ -1,0 +1,169 @@
+export const contractsArray = [
+ 
+  {
+    name: "0G2NFTEscrow",
+    contractCode: `// SPDX-License-Identifier: MIT
+pragma solidity 0.8.27;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+/**
+ * @title 0G-to-NFT Escrow Contract
+ * @dev P2P transactions using ETH through escrow for NFTs.
+ */
+contract 0G2NFTEscrow is ReentrancyGuard {
+
+    struct EscrowOrder {
+        address partyA;
+        address partyB;
+        address nftContract;
+        uint256 nftTokenId;
+        uint256 ethAmount;
+        bool partyADeposited;
+        bool partyBDeposited;
+        bool executed;
+    }
+
+    mapping(uint256 => EscrowOrder) public escrowOrders;
+    uint256 public nextOrderId;
+
+    event EscrowOrderCreated(
+        uint256 indexed orderId,
+        address indexed partyA,
+        address indexed partyB,
+        address nftContract,
+        uint256 nftTokenId,
+        uint256 ethAmount
+    );
+
+    event PartyADeposit(uint256 indexed orderId, address indexed partyA);
+    event PartyBDeposit(uint256 indexed orderId, address indexed partyB);
+    event EscrowExecuted(uint256 indexed orderId);
+    event EscrowCancelled(uint256 indexed orderId);
+
+    modifier validContract(address _nftContract) {
+        require(_nftContract.code.length > 0, "Invalid NFT contract");
+        _;
+    }
+
+    modifier onlyParties(uint256 orderId) {
+        EscrowOrder storage order = escrowOrders[orderId];
+        require(
+            msg.sender == order.partyA || msg.sender == order.partyB,
+            "Not authorized"
+        );
+        _;
+    }
+
+    modifier notExecuted(uint256 orderId) {
+        require(!escrowOrders[orderId].executed, "Already executed");
+        _;
+    }
+
+    function createEscrowOrder(
+        address _partyB,
+        address _nftContract,
+        uint256 _nftTokenId,
+        uint256 _ethAmount
+    ) external validContract(_nftContract) {
+        EscrowOrder storage order = escrowOrders[nextOrderId];
+        order.partyA = msg.sender;
+        order.partyB = _partyB;
+        order.nftContract = _nftContract;
+        order.nftTokenId = _nftTokenId;
+        order.ethAmount = _ethAmount;
+        order.partyADeposited = false;
+        order.partyBDeposited = false;
+        order.executed = false;
+
+        emit EscrowOrderCreated(
+            nextOrderId,
+            msg.sender,
+            _partyB,
+            _nftContract,
+            _nftTokenId,
+            _ethAmount
+        );
+        nextOrderId++;
+    }
+
+    function depositETHByPartyA(uint256 orderId) external payable nonReentrant onlyParties(orderId) {
+        EscrowOrder storage order = escrowOrders[orderId];
+        require(!order.executed, "Already executed");
+        require(!order.partyADeposited, "Already deposited");
+        require(msg.value == order.ethAmount, "Incorrect ETH amount");
+
+        order.partyADeposited = true;
+        emit PartyADeposit(orderId, msg.sender);
+    }
+
+    function depositNFTByPartyB(uint256 orderId) external nonReentrant onlyParties(orderId) {
+        EscrowOrder storage order = escrowOrders[orderId];
+        require(!order.executed, "Already executed");
+        require(!order.partyBDeposited, "Already deposited");
+
+        IERC721(order.nftContract).safeTransferFrom(
+            msg.sender,
+            address(this),
+            order.nftTokenId
+        );
+
+        order.partyBDeposited = true;
+        emit PartyBDeposit(orderId, msg.sender);
+    }
+
+    function executeTransaction(uint256 orderId) external nonReentrant onlyParties(orderId) {
+        EscrowOrder storage order = escrowOrders[orderId];
+        require(order.partyADeposited, "PartyA has not deposited");
+        require(order.partyBDeposited, "PartyB has not deposited");
+        require(!order.executed, "Already executed");
+
+        (bool success, ) = order.partyB.call{value: order.ethAmount}("");
+        require(success, "ETH transfer failed");
+
+        IERC721(order.nftContract).safeTransferFrom(
+            address(this),
+            order.partyA,
+            order.nftTokenId
+        );
+
+        order.executed = true;
+        emit EscrowExecuted(orderId);
+    }
+
+    function cancelEscrow(uint256 orderId) external nonReentrant onlyParties(orderId) {
+        EscrowOrder storage order = escrowOrders[orderId];
+        require(!order.executed, "Cannot cancel executed order");
+
+        if (order.partyADeposited) {
+            (bool success, ) = order.partyA.call{value: order.ethAmount}("");
+            require(success, "ETH refund failed");
+        }
+
+        if (order.partyBDeposited) {
+            IERC721(order.nftContract).safeTransferFrom(
+                address(this),
+                order.partyB,
+                order.nftTokenId
+            );
+        }
+
+        delete escrowOrders[orderId];
+        emit EscrowCancelled(orderId);
+    }
+}`,
+    abi: [{"inputs":[],"name":"ReentrancyGuardReentrantCall","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"EscrowCancelled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"EscrowExecuted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"orderId","type":"uint256"},{"indexed":true,"internalType":"address","name":"partyA","type":"address"},{"indexed":true,"internalType":"address","name":"partyB","type":"address"},{"indexed":false,"internalType":"address","name":"nftContract","type":"address"},{"indexed":false,"internalType":"uint256","name":"nftTokenId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"ethAmount","type":"uint256"}],"name":"EscrowOrderCreated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"orderId","type":"uint256"},{"indexed":true,"internalType":"address","name":"partyA","type":"address"}],"name":"PartyADeposit","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"orderId","type":"uint256"},{"indexed":true,"internalType":"address","name":"partyB","type":"address"}],"name":"PartyBDeposit","type":"event"},{"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"cancelEscrow","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_partyB","type":"address"},{"internalType":"address","name":"_nftContract","type":"address"},{"internalType":"uint256","name":"_nftTokenId","type":"uint256"},{"internalType":"uint256","name":"_ethAmount","type":"uint256"}],"name":"createEscrowOrder","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"depositETHByPartyA","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"depositNFTByPartyB","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"escrowOrders","outputs":[{"internalType":"address","name":"partyA","type":"address"},{"internalType":"address","name":"partyB","type":"address"},{"internalType":"address","name":"nftContract","type":"address"},{"internalType":"uint256","name":"nftTokenId","type":"uint256"},{"internalType":"uint256","name":"ethAmount","type":"uint256"},{"internalType":"bool","name":"partyADeposited","type":"bool"},{"internalType":"bool","name":"partyBDeposited","type":"bool"},{"internalType":"bool","name":"executed","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"executeTransaction","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"nextOrderId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}], // You'll need to fill this with the actual ABI after deployment
+    bytecode: "6080604052348015600e575f5ffd5b5060015f8190555061197b806100235f395ff3fe60806040526004361061006f575f3560e01c8063dc752e8b1161004d578063dc752e8b146100e1578063e018243614610109578063ee22610b14610131578063fa44b377146101595761006f565b80632a58b3301461007357806331df723b1461009d578063c17da6d8146100b9575b5f5ffd5b34801561007e575f5ffd5b5061008761019c565b6040516100949190611231565b60405180910390f35b6100b760048036038101906100b29190611278565b6101a2565b005b3480156100c4575f5ffd5b506100df60048036038101906100da9190611278565b610413565b005b3480156100ec575f5ffd5b50610107600480360381019061010291906112fd565b6106d1565b005b348015610114575f5ffd5b5061012f600480360381019061012a9190611278565b6108f6565b005b34801561013c575f5ffd5b5061015760048036038101906101529190611278565b610d1d565b005b348015610164575f5ffd5b5061017f600480360381019061017a9190611278565b611105565b60405161019398979695949392919061138a565b60405180910390f35b60025481565b6101aa6111cc565b805f60015f8381526020019081526020015f209050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614806102695750806001015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16145b6102a8576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161029f90611460565b60405180910390fd5b5f60015f8581526020019081526020015f2090508060050160029054906101000a900460ff161561030e576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610305906114c8565b60405180910390fd5b806005015f9054906101000a900460ff161561035f576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161035690611530565b60405180910390fd5b806004015434146103a5576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161039c90611598565b60405180910390fd5b6001816005015f6101000a81548160ff0219169083151502179055503373ffffffffffffffffffffffffffffffffffffffff16847f494718383d23bb1f740e6de47978a9681b0768710ad32f6d67eef935f7809a8060405160405180910390a3505050610410611210565b50565b61041b6111cc565b805f60015f8381526020019081526020015f209050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614806104da5750806001015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16145b610519576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161051090611460565b60405180910390fd5b5f60015f8581526020019081526020015f2090508060050160029054906101000a900460ff161561057f576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610576906114c8565b60405180910390fd5b8060050160019054906101000a900460ff16156105d1576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016105c890611530565b60405180910390fd5b806002015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166342842e0e333084600301546040518463ffffffff1660e01b8152600401610635939291906115b6565b5f604051808303815f87803b15801561064c575f5ffd5b505af115801561065e573d5f5f3e3d5ffd5b5050505060018160050160016101000a81548160ff0219169083151502179055503373ffffffffffffffffffffffffffffffffffffffff16847f988aef9037030efcc94e1c621ed73c793343d9d7445753e6de7c1674be92a31c60405160405180910390a35050506106ce611210565b50565b825f8173ffffffffffffffffffffffffffffffffffffffff163b1161072b576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161072290611635565b60405180910390fd5b5f60015f60025481526020019081526020015f20905033815f015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555085816001015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555084816002015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508381600301819055508281600401819055505f816005015f6101000a81548160ff0219169083151502179055505f8160050160016101000a81548160ff0219169083151502179055505f8160050160026101000a81548160ff0219169083151502179055508573ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff166002547f3d64ca7467896e4597c62a7e429f4cad32682ad0c30a21dc7b77445c473f21128888886040516108cf93929190611653565b60405180910390a460025f8154809291906108e9906116b5565b9190505550505050505050565b6108fe6111cc565b805f60015f8381526020019081526020015f209050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614806109bd5750806001015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16145b6109fc576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016109f390611460565b60405180910390fd5b5f60015f8581526020019081526020015f2090508060050160029054906101000a900460ff1615610a62576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610a5990611746565b60405180910390fd5b806005015f9054906101000a900460ff1615610b48575f815f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168260040154604051610ac390611791565b5f6040518083038185875af1925050503d805f8114610afd576040519150601f19603f3d011682016040523d82523d5f602084013e610b02565b606091505b5050905080610b46576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610b3d906117ef565b60405180910390fd5b505b8060050160019054906101000a900460ff1615610c1457806002015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166342842e0e30836001015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1684600301546040518463ffffffff1660e01b8152600401610be6939291906115b6565b5f604051808303815f87803b158015610bfd575f5ffd5b505af1158015610c0f573d5f5f3e3d5ffd5b505050505b60015f8581526020019081526020015f205f5f82015f6101000a81549073ffffffffffffffffffffffffffffffffffffffff0219169055600182015f6101000a81549073ffffffffffffffffffffffffffffffffffffffff0219169055600282015f6101000a81549073ffffffffffffffffffffffffffffffffffffffff0219169055600382015f9055600482015f9055600582015f6101000a81549060ff02191690556005820160016101000a81549060ff02191690556005820160026101000a81549060ff02191690555050837f0d977c6b1a383ac5ce532b4a668d0ef9ad38478e1a5ff28abb221f4b682b264360405160405180910390a2505050610d1a611210565b50565b610d256111cc565b805f60015f8381526020019081526020015f209050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161480610de45750806001015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16145b610e23576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610e1a90611460565b60405180910390fd5b5f60015f8581526020019081526020015f209050806005015f9054906101000a900460ff16610e87576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610e7e90611857565b60405180910390fd5b8060050160019054906101000a900460ff16610ed8576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610ecf906118bf565b60405180910390fd5b8060050160029054906101000a900460ff1615610f2a576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610f21906114c8565b60405180910390fd5b5f816001015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168260040154604051610f7690611791565b5f6040518083038185875af1925050503d805f8114610fb0576040519150601f19603f3d011682016040523d82523d5f602084013e610fb5565b606091505b5050905080610ff9576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610ff090611927565b60405180910390fd5b816002015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166342842e0e30845f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1685600301546040518463ffffffff1660e01b815260040161107f939291906115b6565b5f604051808303815f87803b158015611096575f5ffd5b505af11580156110a8573d5f5f3e3d5ffd5b5050505060018260050160026101000a81548160ff021916908315150217905550847f115dcb3a8fe6c704afaa7821675c7cd813fa08a3e79d90984654dd42b357649160405160405180910390a250505050611102611210565b50565b6001602052805f5260405f205f91509050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806001015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806002015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806003015490806004015490806005015f9054906101000a900460ff16908060050160019054906101000a900460ff16908060050160029054906101000a900460ff16905088565b60025f5403611207576040517f3ee5aeb500000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b60025f81905550565b60015f81905550565b5f819050919050565b61122b81611219565b82525050565b5f6020820190506112445f830184611222565b92915050565b5f5ffd5b61125781611219565b8114611261575f5ffd5b50565b5f813590506112728161124e565b92915050565b5f6020828403121561128d5761128c61124a565b5b5f61129a84828501611264565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6112cc826112a3565b9050919050565b6112dc816112c2565b81146112e6575f5ffd5b50565b5f813590506112f7816112d3565b92915050565b5f5f5f5f608085870312156113155761131461124a565b5b5f611322878288016112e9565b9450506020611333878288016112e9565b935050604061134487828801611264565b925050606061135587828801611264565b91505092959194509250565b61136a816112c2565b82525050565b5f8115159050919050565b61138481611370565b82525050565b5f6101008201905061139e5f83018b611361565b6113ab602083018a611361565b6113b86040830189611361565b6113c56060830188611222565b6113d26080830187611222565b6113df60a083018661137b565b6113ec60c083018561137b565b6113f960e083018461137b565b9998505050505050505050565b5f82825260208201905092915050565b7f4e6f7420617574686f72697a65640000000000000000000000000000000000005f82015250565b5f61144a600e83611406565b915061145582611416565b602082019050919050565b5f6020820190508181035f8301526114778161143e565b9050919050565b7f416c7265616479206578656375746564000000000000000000000000000000005f82015250565b5f6114b2601083611406565b91506114bd8261147e565b602082019050919050565b5f6020820190508181035f8301526114df816114a6565b9050919050565b7f416c7265616479206465706f73697465640000000000000000000000000000005f82015250565b5f61151a601183611406565b9150611525826114e6565b602082019050919050565b5f6020820190508181035f8301526115478161150e565b9050919050565b7f496e636f72726563742045544820616d6f756e740000000000000000000000005f82015250565b5f611582601483611406565b915061158d8261154e565b602082019050919050565b5f6020820190508181035f8301526115af81611576565b9050919050565b5f6060820190506115c95f830186611361565b6115d66020830185611361565b6115e36040830184611222565b949350505050565b7f496e76616c6964204e465420636f6e74726163740000000000000000000000005f82015250565b5f61161f601483611406565b915061162a826115eb565b602082019050919050565b5f6020820190508181035f83015261164c81611613565b9050919050565b5f6060820190506116665f830186611361565b6116736020830185611222565b6116806040830184611222565b949350505050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f6116bf82611219565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036116f1576116f0611688565b5b600182019050919050565b7f43616e6e6f742063616e63656c206578656375746564206f72646572000000005f82015250565b5f611730601c83611406565b915061173b826116fc565b602082019050919050565b5f6020820190508181035f83015261175d81611724565b9050919050565b5f81905092915050565b50565b5f61177c5f83611764565b91506117878261176e565b5f82019050919050565b5f61179b82611771565b9150819050919050565b7f45544820726566756e64206661696c65640000000000000000000000000000005f82015250565b5f6117d9601183611406565b91506117e4826117a5565b602082019050919050565b5f6020820190508181035f830152611806816117cd565b9050919050565b7f50617274794120686173206e6f74206465706f736974656400000000000000005f82015250565b5f611841601883611406565b915061184c8261180d565b602082019050919050565b5f6020820190508181035f83015261186e81611835565b9050919050565b7f50617274794220686173206e6f74206465706f736974656400000000000000005f82015250565b5f6118a9601883611406565b91506118b482611875565b602082019050919050565b5f6020820190508181035f8301526118d68161189d565b9050919050565b7f455448207472616e73666572206661696c6564000000000000000000000000005f82015250565b5f611911601383611406565b915061191c826118dd565b602082019050919050565b5f6020820190508181035f83015261193e81611905565b905091905056fea26469706673582212206c6e26841a335b8e292f8c976bd7f419de530dcb17d3235a5fcdf90c4933bf3364736f6c634300081b0033",
+     // You'll need to fill this with the actual bytecode after deployment
+
+     solidityScanResults: {
+        securityScore: 86.93,
+        threatScore: 100,
+        securityScoreComments: "Your Security Score is GREAT\n\nThe SolidityScan score is calculated based on lines of code and weights assigned to each issue depending on the severity and confidence. To improve your score, view the detailed result and leverage the remediation solutions provided.",
+        securityScanComments: "THREAT SUMMARY\n\nYour smart contract has been assessed and assigned a Low Risk threat score. The score indicates the likelihood of risk associated with the contract code."
+      }
+  },
+
+ 
+];
