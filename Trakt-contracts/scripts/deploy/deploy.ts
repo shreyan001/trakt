@@ -13,7 +13,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // 1. Deploy ZKPVerifier (alternative)
 
     // 2. Prepare initialization parameters
-    const nftName =  "Trakt Agent";
+    const nftName =  "Trakt  DEFI Agent";
     const nftSymbol = "TRKT";
     const chainURL = process.env.ZG_RKC_URL || "https://evmrpc-testnet.0g.ai";
     const indexerURL = process.env.ZG_INDEXER_URL || "https://indexer-storage-testnet-turbo.0g.ai";
